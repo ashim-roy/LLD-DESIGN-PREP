@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Java / Maven build output
+**/target/
+
+# IDE files
+**/.idea/
+*.iml
+
+# Logs
+*.log
