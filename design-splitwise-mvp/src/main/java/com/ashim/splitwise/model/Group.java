@@ -36,8 +36,12 @@ public class Group {
         return groupName;
     }
 
-    public Optional<List<User>> getMembers() {
-        return Optional.ofNullable(members);
+//    public Optional<List<User>> getMembers() {
+//        return Optional.ofNullable(members);
+//    }
+    // This returns an immutable snapshot of the members list, preventing callers from modifying your internal collection. Optional.ofNullable(members) isn't necessary because members is initialized and never set to null.
+    public List<User> getMembers() {
+        return List.copyOf(members);
     }
 
     public User getCreatedBy() {
