@@ -1,7 +1,9 @@
 package com.ashim.splitwise.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Locale;
+import java.util.Objects;
 
 public class Money {
     private final BigDecimal amount;
@@ -50,6 +52,45 @@ public class Money {
         BigDecimal newAmount = this.amount.add(other.getAmount());
 
         return new Money(newAmount, this.currency);
+    }
+
+    public Money divide(int divisor) {
+        if (divisor <= 0) {
+            throw new IllegalArgumentException(
+                    "Divisor must be greater than zero"
+            );
+        }
+
+        return new Money(amount.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.DOWN),
+                currency
+        );
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof Money other)) {
+            return false;
+        }
+
+        return amount.compareTo(other.amount) == 0
+                && currency.equals(other.currency);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                amount.stripTrailingZeros(),
+                currency
+        );
+    }
+
+    @Override
+    public String toString() {
+        return currency + " " + amount.toPlainString();
     }
 
 
