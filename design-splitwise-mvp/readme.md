@@ -1,336 +1,316 @@
-# Splitwise MVP — Low-Level Design in Java
+# Splitwise Backend — Java LLD MVP
 
-## 1. Project Overview
+A small, interview-focused implementation of the core Splitwise domain in Java. The project is designed to demonstrate object-oriented design, clear domain boundaries, the Strategy pattern, monetary correctness, and balance calculation without introducing a framework or database prematurely.
 
-A minimal, interview-oriented implementation of Splitwise using Java 21, Maven, and JUnit 5.
+> **Project status:** In-memory MVP in progress. The README distinguishes the current implementation from planned capabilities so the documentation does not promise features that may not yet exist in code.
 
-The application allows users to record shared expenses, split costs among participants, calculate outstanding balances, and record settlements.
+## Contents
 
-**Primary goal:** Practice object-oriented design, SOLID principles, Strategy pattern, monetary calculations, and unit testing through a working Java application.
+- [Goals](#goals)
+- [Technology](#technology)
+- [Current implementation](#current-implementation)
+- [Domain model](#domain-model)
+- [How balances work](#how-balances-work)
+- [Planned behavior](#planned-behavior)
+- [Project structure](#project-structure)
+- [Build and run](#build-and-run)
+- [Design decisions](#design-decisions)
+- [Validation and edge cases](#validation-and-edge-cases)
+- [Interview discussion guide](#interview-discussion-guide)
+- [Roadmap](#roadmap)
 
-## 2. Technology Stack
+## Goals
 
-- Java 21
-- Maven
-- JUnit 5
-- In-memory storage using Java collections
-- Mermaid diagrams for design documentation
+The MVP models the essential expense-sharing workflow:
 
-No Spring Boot, database, REST APIs, authentication, or external infrastructure is required for this MVP.
+1. Represent users and groups.
+2. Record an expense and the share assigned to each participant.
+3. Calculate each user's net position from expenses.
+4. Extend the model to support payment suggestions and recorded settlements.
+5. Keep the business logic understandable and easy to explain in a 35–45 minute LLD interview.
 
-## 3. Functional Requirements
+The emphasis is on correctness and separation of responsibilities—not on adding infrastructure for its own sake.
 
-### 3.1 Users
+## Technology
 
-- Create users with a unique ID and name.
-- Identify users when recording expenses and settlements.
+- **Java 21**
+- **Maven**
+- **JUnit 5**
+- **Java collections** for in-memory data
+- **Mermaid** for diagrams in this README
 
-### 3.2 Groups
+The MVP does not require Spring Boot, a database, REST APIs, authentication, Kafka, or Redis.
 
-- Create a group with a name and members.
-- Add expenses associated with a group.
-- Ensure expense participants belong to the group.
-- Support expenses between individual users without requiring a group.
+## Current implementation
 
-### 3.3 Expense Management
+The following reflects the baseline implementation currently described by the project work. Treat the status of recently added classes as unverified until they are present in the repository and compile successfully.
 
-- Record an expense with a description, total amount, payer, participants, and split details.
-- Support expenses inside or outside a group.
-- View recorded expenses.
-
-The expense description is free-form text. Examples include dinner, rent, cab, groceries, and movie tickets. Expense descriptions must not be hard-coded as enums.
-
-### 3.4 Expense Splitting
-
-Support three splitting strategies through a common `SplitStrategy` interface.
-
-| Strategy | Description | Example |
+| Component | Responsibility | Status |
 |---|---|---|
-| Equal | Divide the total equally among participants | ₹900 among 3 people |
-| Exact | Specify the amount owed by each participant | ₹500, ₹300, ₹200 |
-| Percentage | Specify each participant's percentage share | 50%, 30%, 20% |
+| `User` | Represents a user with an ID, name, and email | Implemented |
+| `Group` | Maintains group membership and prevents removing the creator | Implemented |
+| `Money` | Represents a non-negative monetary amount and currency | Implemented |
+| `ExpenseSplit` | Associates a participant with their share of an expense | Implemented |
+| `Expense` | Holds the payer, group, total, description, and participant shares; validates membership and total allocation | Implemented |
+| `SplitStrategy` | Common contract for split calculations | Implemented |
+| `EqualSplitStrategy` | Calculates equal shares and rejects duplicate participants | Implemented |
+| `BalanceSheet` | Simple per-user amount accumulator | Implemented, but not suitable for signed net balances |
+| `BalanceService` | Calculates signed net positions from expenses | Implemented baseline |
+| `ExpenseService` | Coordinates expense creation and retrieval | Planned / verify in code |
+| `PaymentSuggestion` | Represents a suggested payment from one user to another | Planned / verify in code |
+| `DebtSimplifier` | Simplifies balances into suggested payments | Planned / verify in code |
+| `Settlement` | Represents an actual payment between users | Planned / verify in code |
+| `SettlementService` | Validates and records actual payments | Planned / verify in code |
 
-Requirements:
+### Supported split strategy
 
-- Every participant must have a valid, non-negative share.
-- Exact amounts must add up to the expense total.
-- Percentage shares must add up to 100%.
-- The calculated shares must add up to the total expense, with currency rounding handled correctly.
-- Invalid splits must be rejected before an expense is recorded.
+The current strategy implementation is equal splitting. Exact and percentage splitting can be added later through the same `SplitStrategy` abstraction.
 
-**Design principle:** Adding a new splitting strategy should not require modifying existing strategies.
-
-### 3.5 Balance Calculation
-
-Calculate the outstanding amount between users based on recorded expenses and settlements.
-
-For each expense:
-
-- The payer receives credit for the full amount paid.
-- Each participant is responsible for their calculated share.
-- A participant's net position is their payments minus their allocated expenses.
-
-A positive net position means the user should receive money. A negative net position means the user owes money.
-
-Balances must remain consistent across the group: the sum of all net balances must equal zero.
-
-### 3.6 Debt Simplification
-
-Provide an operation to simplify outstanding debts into a smaller set of suggested payments.
-
-Example:
-
-- A owes B ₹500.
-- B owes C ₹500.
-- Simplified result: A pays C ₹500.
-
-Debt simplification changes the suggested payment relationships, not the underlying expense or settlement history.
-
-The initial implementation can use a straightforward greedy algorithm. Heap-based optimization can be explored later if needed.
-
-### 3.7 Settlements
-
-- Record a settlement between two users.
-- Validate that the settlement amount is positive.
-- Reduce the outstanding debt between the relevant users.
-- Reject settlements that exceed the amount owed in the specified direction.
-- Preserve the settlement history.
-
-A settlement is a separate financial record; it does not delete or modify the original expense.
-
-## 4. Non-Functional Requirements
-
-- Clear separation of responsibilities.
-- Testable business logic independent of storage.
-- Monetary calculations using `BigDecimal`, not `double`.
-- Meaningful validation and exceptions.
-- No unnecessary frameworks or infrastructure.
-- Readable code that can be explained in a 35–45 minute LLD interview.
-
-Concurrency control, persistence, authentication, and distributed-system concerns are out of scope for this in-memory MVP.
-
-## 5. Domain Model
-
-### Core classes
-
-| Class / Interface | Responsibility |
-|---|---|
-| `User` | Represents an individual participant |
-| `Group` | Maintains group membership |
-| `Expense` | Records the payer, total amount, description, participants, and shares |
-| `Split` | Represents one participant's share of an expense |
-| `SplitStrategy` | Defines the contract for calculating shares |
-| `EqualSplitStrategy` | Calculates equal shares |
-| `ExactSplitStrategy` | Validates and applies explicit amounts |
-| `PercentageSplitStrategy` | Calculates shares from percentages |
-| `BalanceService` | Calculates outstanding balances |
-| `Settlement` | Records a payment between users |
-| `SettlementService` | Validates and records settlements |
-| `ExpenseService` | Coordinates expense creation and retrieval |
-| `DebtSimplifier` | Produces simplified payment suggestions |
-
-IDs should be used to identify users and groups consistently. Domain objects should validate their own invariants where appropriate, while services coordinate operations across objects.
-
-## 6. Architecture
-
-The application follows a simple layered structure:
-
-- **Domain:** Users, groups, expenses, splits, and settlements.
-- **Strategy:** Independent algorithms for calculating expense shares.
-- **Service:** Expense creation, balance calculation, settlement processing, and debt simplification.
-- **In-memory storage:** Maps or collections used to store records during execution.
-- **Tests:** Unit tests for domain rules, strategies, services, and edge cases.
-
-Repositories and database abstractions can be introduced later if they improve the design. They are not mandatory for the initial MVP.
-
-## 7. Expense Creation Flow
-
-```mermaid
-flowchart TD
-    A[Receive expense details] --> B[Validate payer and participants]
-    B --> C{Valid users and group?}
-    C -- No --> X[Reject request]
-    C -- Yes --> D[Select split strategy]
-    D --> E[Calculate participant shares]
-    E --> F{Shares valid and total matches?}
-    F -- No --> X
-    F -- Yes --> G[Create and store expense]
-    G --> H[Expense recorded]
-```
-
-## 8. Class Diagram
+## Domain model
 
 ```mermaid
 classDiagram
     class User {
-        +String id
+        +UUID id
         +String name
+        +String email
     }
 
     class Group {
-        +String id
-        +String name
-        +addMember(User user)
+        +UUID groupId
+        +String groupName
+        +User createdBy
+        +addMember(User)
+        +removeMember(User)
+    }
+
+    class Money {
+        +BigDecimal amount
+        +String currency
+        +add(Money)
+        +divide(int)
     }
 
     class Expense {
-        +String id
+        +UUID expenseId
         +String description
-        +BigDecimal amount
+        +Group group
         +User paidBy
-        +List~Split~ splits
+        +Money totalAmount
+        +List~ExpenseSplit~ splits
     }
 
-    class Split {
+    class ExpenseSplit {
         +User user
-        +BigDecimal amount
+        +Money amount
     }
 
     class SplitStrategy {
         <<interface>>
-        +calculateSplits(BigDecimal amount, List participants)
+        +split(Money, List~User~)
     }
 
-    class EqualSplitStrategy
-    class ExactSplitStrategy
-    class PercentageSplitStrategy
-
-    class ExpenseService {
-        +createExpense()
-        +getExpenses()
+    class EqualSplitStrategy {
+        +split(Money, List~User~)
     }
 
     class BalanceService {
-        +getBalances()
+        +calculateBalance(List~Expense~)
     }
 
-    class Settlement {
-        +String id
-        +User from
-        +User to
-        +BigDecimal amount
-    }
-
-    class SettlementService {
-        +settle()
-    }
-
-    class DebtSimplifier {
-        +simplifyDebts()
-    }
-
-    Group o-- User
+    Group o-- User : members
+    Expense --> Group
     Expense --> User : payer
-    Expense *-- Split
-    Split --> User
+    Expense *-- ExpenseSplit
+    ExpenseSplit --> User
+    ExpenseSplit --> Money
+    Expense --> Money
     SplitStrategy <|.. EqualSplitStrategy
-    SplitStrategy <|.. ExactSplitStrategy
-    SplitStrategy <|.. PercentageSplitStrategy
-    ExpenseService --> SplitStrategy
-    ExpenseService --> Expense
     BalanceService --> Expense
-    BalanceService --> Settlement
-    SettlementService --> Settlement
-    DebtSimplifier --> BalanceService
 ```
 
-## 9. Balance Calculation Rules
+### Core domain rules
 
-For each user:
+- A user and group have stable IDs.
+- A group creator is added to the group when it is created.
+- An expense payer must be a member of the expense's group.
+- Every participant in an expense split must belong to that group.
+- Split amounts must add up to the expense total.
+- A split is a participant's allocated share; it is not itself a payment or an outstanding debt.
+- `Money` values may only be added when their currency codes match.
 
-**Net balance = Total paid − Total allocated shares − Net settlements paid**
+## How balance calculation works
 
-More precisely, a settlement from A to B decreases A's net balance and increases B's net balance by the same amount.
+For each expense, the service:
 
-Example:
+1. Credits the payer with the full amount they paid.
+2. Debits each participant by their allocated share.
+3. Adds those signed amounts to a per-user balance.
 
-A pays ₹900 for a shared expense split equally among A, B, and C.
+The resulting net position is interpreted as follows:
 
-- A paid: ₹900
-- A's share: ₹300
-- B's share: ₹300
-- C's share: ₹300
+- **Positive:** the user should receive money.
+- **Negative:** the user owes money.
+- **Zero:** the user's net position is settled.
 
-Net positions:
+### Example
 
-- A: +₹600
-- B: −₹300
-- C: −₹300
+Alice pays ₹900 for an expense shared equally by Alice, Bob, and Charlie.
 
-Therefore, B owes A ₹300 and C owes A ₹300.
+| User | Paid | Share | Net balance |
+|---|---:|---:|---:|
+| Alice | ₹900 | ₹300 | +₹600 |
+| Bob | ₹0 | ₹300 | −₹300 |
+| Charlie | ₹0 | ₹300 | −₹300 |
+| **Total** | **₹900** | **₹900** | **₹0** |
 
-The sum of net balances is zero. The balance calculation must not double-count the payer's share.
+The sum of net balances should be zero when the expense is fully allocated. The payer's own share is accounted for by crediting the full payment and debiting their allocated share.
 
-## 10. Edge Cases and Validation
+> **Current limitation:** the baseline `BalanceService` calculates balances from expenses only. Recorded settlements must be incorporated before its output represents the remaining amount owed after payments.
 
-The MVP must cover:
+## Planned behavior
 
-- Zero or negative expense amounts.
-- Missing users or duplicate user IDs.
-- Groups with invalid members.
-- Payers or participants outside the specified group.
-- Empty participant lists.
-- Duplicate participants in a split.
-- Exact shares that do not add up to the total.
-- Percentage shares that do not add up to 100%.
-- Rounding issues when dividing currency equally.
-- Settlements with zero or negative amounts.
-- Settlements exceeding the outstanding debt.
-- Multiple expenses between the same users.
-- Multiple settlements affecting the same balance.
-- Debt simplification with zero balances or only one user with a non-zero position.
+### 1. Group-wise and global balances
 
-Use `BigDecimal` with an explicit currency scale and rounding policy. For equal splits, distribute any remaining minor currency units deterministically so that the shares always add up to the original total.
+Two calculation scopes are planned:
 
-## 11. Testing Strategy
+- **Group-wise:** calculate net positions using expenses and settlements belonging to one group.
+- **Global:** calculate net positions across a selected set of groups, allowing a user's position in one group to offset their position in another.
 
-Use JUnit 5 to write unit tests for:
+For global calculations, include only the groups the user intends to combine. Never combine different currencies into one balance unless explicit exchange-rate conversion is implemented.
 
-- Each splitting strategy.
-- Invalid expense and split inputs.
-- Expense creation.
-- Balance calculation across multiple expenses.
-- Settlement validation and balance updates.
-- Debt simplification.
-- Monetary rounding and balance conservation.
+### 2. Debt simplification
 
-Tests should verify both expected results and important invariants, particularly that all expense shares sum to the expense total and all group net balances sum to zero.
+`DebtSimplifier` will take a set of signed net balances and produce `PaymentSuggestion` objects. It should not mutate expense history or record actual payments.
 
-## 12. Out of Scope
+A greedy debtor/creditor matching algorithm is a good initial implementation. It can reduce the number of payments, though it does not guarantee the globally minimum number for every possible balance distribution.
 
-The following features are intentionally excluded from this MVP:
+### 3. Settlements
 
-- Spring Boot and REST APIs.
-- PostgreSQL or other persistent databases.
-- OAuth2 and authentication.
-- Redis, Kafka, and notifications.
-- Receipt uploads and file storage.
-- Production concurrency controls.
-- Editing and deleting recorded expenses.
-- Actual payment processing.
-- Multi-currency conversion.
+A `Settlement` represents an actual payment from a payer to a receiver. `SettlementService` will validate and record payments, and balance calculation will account for those recorded settlements.
 
-These features may be introduced in a separate, more advanced Splitwise backend project.
+The design must distinguish these concepts:
 
-## 13. Implementation Milestones
+- **Payment suggestion:** a recommendation for what someone could pay.
+- **Recorded settlement:** a payment that has actually happened.
 
-1. Create the domain classes: `User`, `Group`, `Expense`, and `Split`.
-2. Implement and test the three splitting strategies.
-3. Implement expense creation and in-memory storage.
-4. Implement balance calculation and test multi-expense scenarios.
-5. Implement settlements and validate their effect on balances.
-6. Implement and test debt simplification.
-7. Complete the README and verify the full test suite.
+The service should reject invalid amounts and, when the balance workflow is integrated, prevent a payment from exceeding the relevant outstanding amount.
 
-## 14. Definition of Done
+## Project structure
 
-The MVP is complete when:
+Expected package layout:
 
-- The Java application compiles and runs.
-- All three splitting strategies work correctly.
-- Invalid expenses and splits are rejected.
-- Balances remain correct across multiple expenses and settlements.
-- Debt simplification produces valid payment suggestions.
-- JUnit 5 tests pass.
-- The implementation matches the documented class and flow diagrams.
-- The design can be explained clearly in a senior Java LLD interview.
+```text
+src/
+├── main/
+│   └── java/com/ashim/splitwise/
+│       ├── model/
+│       │   ├── User.java
+│       │   ├── Group.java
+│       │   ├── Money.java
+│       │   ├── Expense.java
+│       │   ├── ExpenseSplit.java
+│       │   └── BalanceSheet.java
+│       ├── strategy/
+│       │   ├── SplitStrategy.java
+│       │   └── EqualSplitStrategy.java
+│       └── service/
+│           └── BalanceService.java
+└── test/
+    └── java/com/ashim/splitwise/
+        ├── model/
+        │   └── MoneyTest.java
+        └── strategy/
+            └── EqualSplitStrategyTest.java
+```
+
+Update this tree as additional classes are implemented. The repository is currently an in-memory domain exercise; there is no repository or database layer in the baseline design.
+
+## Build and run
+
+You need JDK 21 and Maven installed.
+
+Compile the project:
+
+```bash
+mvn -q -DskipTests compile
+```
+
+Run the test suite:
+
+```bash
+mvn test
+```
+
+If Maven reports a duplicate `org.junit.jupiter:junit-jupiter` dependency in `pom.xml`, remove the duplicate declaration and keep one versioned dependency.
+
+## Design decisions
+
+### `BigDecimal` for money
+
+Financial values should not use `double` because binary floating-point arithmetic can introduce representation errors. `Money` uses `BigDecimal` and checks currency compatibility for addition.
+
+### Currency-aware amounts
+
+Amounts with different currencies must not be added together. A future multi-currency implementation should define exchange-rate sources, conversion timing, rounding rules, and the currency in which each user's balance is presented.
+
+### Immutable value objects and defensive copies
+
+`Money` is immutable. Collections exposed by models and services should be returned as immutable snapshots so callers cannot accidentally mutate internal state.
+
+### Strategy pattern for splitting
+
+`SplitStrategy` isolates the algorithm that calculates participant shares from expense creation. New split types can be added as separate implementations rather than growing one large conditional block.
+
+### Separate calculation from side effects
+
+`BalanceService` calculates balances. `DebtSimplifier` proposes payments. `SettlementService` records actual payments. Keeping these responsibilities separate makes each component easier to test and explain.
+
+### In-memory storage is a deliberate MVP trade-off
+
+Collections are sufficient to demonstrate domain behavior. A repository abstraction and persistent database can be introduced later if durability, querying, or concurrent access becomes part of the requirements.
+
+## Validation and edge cases
+
+The implementation should preserve these invariants as it evolves:
+
+- Reject missing users, groups, amounts, and participant lists.
+- Reject negative expense amounts and non-positive settlement amounts.
+- Reject duplicate participants in one split.
+- Ensure the payer and participants satisfy the group's membership rules.
+- Ensure all split amounts sum exactly to the expense total.
+- Distribute leftover minor currency units deterministically for equal splits (for example, ₹100 among three users becomes ₹33.34, ₹33.33, and ₹33.33).
+- Reject mixed currencies in a single balance calculation.
+- Ensure all net balances sum to zero, subject to exact minor-unit allocation.
+- Ensure settlements reduce the relevant outstanding balances exactly once.
+- Keep suggested payments separate from recorded settlements.
+
+## Interview discussion guide
+
+Be ready to explain:
+
+1. **Why `Money` is a value object:** it keeps amount and currency together and centralizes monetary rules.
+2. **Why use `BigDecimal`:** it avoids binary floating-point errors in financial calculations.
+3. **Why use `SplitStrategy`:** it separates algorithms and supports extension without changing the expense workflow.
+4. **Why separate `ExpenseSplit` and `Settlement`:** a share is an allocation; a settlement is a real transfer of money.
+5. **How balances are derived:** credit the payer, debit each participant's share, then account for recorded settlements.
+6. **Group-wise versus global simplification:** use one group's balance scope or combine a selected set of groups, without mixing currencies.
+7. **What the greedy simplifier guarantees:** valid net settlement suggestions with fewer transactions in many cases, not always the theoretical minimum.
+8. **What changes for production:** persistence, transactional settlement recording, concurrency controls, authorization, API validation, and auditability.
+
+## Roadmap
+
+- [x] Create the core domain models.
+- [x] Add `Money` and equal split strategy.
+- [x] Add baseline expense-based balance calculation.
+- [ ] Fix equal-split remainder distribution.
+- [ ] Implement and integrate `ExpenseService`.
+- [ ] Add group-wise and global balance calculation.
+- [ ] Implement `PaymentSuggestion` and `DebtSimplifier`.
+- [ ] Implement `Settlement` and `SettlementService`.
+- [ ] Add integration and edge-case tests.
+- [ ] Update this README to match the final implementation and diagrams.
+
+## Definition of done
+
+The MVP is complete when the code and documentation agree, the application compiles, split totals are exact, balances remain consistent across expenses and settlements, group-wise and global calculations behave as specified, debt simplification emits valid suggestions, and the test suite passes.
