@@ -25,6 +25,11 @@ public class DebtSimplifier {
             throw new IllegalArgumentException("Balances and currency are required");
         }
 
+        /*
+        DebtSimplifier will take a set of signed net balances and produce PaymentSuggestion objects. It should not mutate expense history or record actual payments.
+        A greedy debtor/creditor matching algorithm is a good initial implementation. It can reduce the number of payments, though it does not guarantee the globally minimum number for every possible balance distribution.
+         */
+
         List<Map.Entry<User, BigDecimal>> debtors = new ArrayList<>();
         List<Map.Entry<User, BigDecimal>> creditors = new ArrayList<>();
 
