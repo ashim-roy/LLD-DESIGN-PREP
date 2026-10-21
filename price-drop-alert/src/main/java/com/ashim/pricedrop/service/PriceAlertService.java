@@ -7,6 +7,7 @@ import com.ashim.pricedrop.repository.ProductRepository;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 public class PriceAlertService {
@@ -100,6 +101,26 @@ public class PriceAlertService {
                 eligibleAlert.markAsNotified();
             }
         }
+
+    }
+
+    // getAlertsForUser(UUID userId) — retrieve all alerts belonging to a user.
+
+    public List<PriceAlert> getAlertsForUser(UUID userId){
+        return priceAlertRepository.findByUserId(userId);
+    }
+
+
+    // deactivateAlert(UUID alertId) — deactivate an existing alert so it won't trigger future notifications.
+
+    public PriceAlert deactivateAlert(UUID alertId){
+        PriceAlert alert = priceAlertRepository.findById(alertId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Alert not found: " + alertId));
+        // orElseThrow() extracts the alert or throws a meaningful exception if it doesn't exist.
+        alert.deactivate();
+
+        return priceAlertRepository.save(alert);
 
     }
 
