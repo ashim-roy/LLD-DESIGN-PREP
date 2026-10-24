@@ -29,10 +29,14 @@ public class NearestElevatorSelectionStrategy implements ElevatorSelectionStrate
         return nearestElevator;
 
     }
-}
+
 /*
 We should eventually handle two edge cases:
 - An empty or null elevator list.
 - No available idle elevator.
 For now, returning null for no idle elevator is consistent with our MVP. Later, ElevatorSystem can decide whether to queue the request or report that no elevator is available.
  */
+
+
+
+}
