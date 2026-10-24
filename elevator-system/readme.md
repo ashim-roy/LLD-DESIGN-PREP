@@ -195,6 +195,7 @@ classDiagram
     ElevatorRequest --> Direction
 ```
 
+
 ## 8. Passenger Request Flow
 
 The following sequence describes how a passenger request is processed.
@@ -207,23 +208,26 @@ sequenceDiagram
     participant Strategy as NearestElevatorSelectionStrategy
     participant Elevator
 
-    Passenger->>System: Request source and destination floors
+    Passenger->>System: Submit source and destination floors
     System->>System: Validate request and floor limits
     System->>Controller: handleRequest(elevators, request)
     Controller->>Strategy: selectElevator(elevators, request)
-    Strategy-->>Controller: Selected idle elevator
-    Controller->>Elevator: Move toward source floor
-    Controller->>Elevator: Open and close doors
-    Note over Elevator: Passenger pickup
-    Controller->>Elevator: Move toward destination floor
-    Controller->>Elevator: Open and close doors
+    Strategy-->>Controller: Return selected idle elevator
+    Controller->>Elevator: Move to source floor
+    Controller->>Elevator: Open doors
+    Controller->>Elevator: Close doors
+    Note over Elevator: Passenger boards
+    Controller->>Elevator: Move to destination floor
+    Controller->>Elevator: Open doors
+    Controller->>Elevator: Close doors
     Controller->>Elevator: stop()
-    Note over Elevator: Journey complete; state is IDLE
+    Note over Elevator: Journey complete - elevator is IDLE
     Controller-->>System: Request processing complete
-    System-->>Passenger: Request handling returns
+    System-->>Passenger: Return from request
 ```
 
 The current simulation is synchronous. The controller performs the entire journey in a single method call, without modeling elapsed travel time.
+
 
 ## 9. Elevator Selection Strategy
 
